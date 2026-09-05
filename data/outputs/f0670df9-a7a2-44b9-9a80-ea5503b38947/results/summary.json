@@ -1,0 +1,21 @@
+{
+  "simulation_id": "proj_tehri_001",
+  "status": "completed",
+  "solver": "fast_swe",
+  "crs": "EPSG:4326",
+  "bounds": [
+    78.45,
+    30.12,
+    78.65,
+    30.4
+  ],
+  "max_depth_m": 8.578761266970556,
+  "max_velocity_ms": 11.74713057731534,
+  "peak_flooded_area_km2": 1.590400000000009e-09,
+  "files": {
+    "max_depth_tif": "/home/laksh/Projects/Dam_Project/data/outputs/f0670df9-a7a2-44b9-9a80-ea5503b38947/results/max_depth.tif",
+    "max_velocity_tif": "/home/laksh/Projects/Dam_Project/data/outputs/f0670df9-a7a2-44b9-9a80-ea5503b38947/results/max_velocity.tif",
+    "arrival_time_tif": "/home/laksh/Projects/Dam_Project/data/outputs/f0670df9-a7a2-44b9-9a80-ea5503b38947/results/arrival_time.tif",
+    "flood_extent_geojson": "/home/laksh/Projects/Dam_Project/data/outputs/f0670df9-a7a2-44b9-9a80-ea5503b38947/results/flood_extent.geojson"
+  }
+}

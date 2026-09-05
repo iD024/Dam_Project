@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "MultiPolygon", "coordinates": []}, "properties": {"simulation_id": "proj_tehri_001", "threshold_m": 0.1, "max_depth_m": NaN}}]}
