@@ -41,7 +41,6 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
-  const [isLooping, setIsLooping] = useState<boolean>(true);
   const playTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Impact and Validation data
@@ -115,7 +114,7 @@ export default function Home() {
               setStepGeojsons(timeline.step_geojsons);
             }
             setCurrentStep(0);
-            setIsPlaying(true);
+            setIsPlaying(false);
           }
         } catch (err) {
           console.warn("Could not load timeline data:", err);
@@ -137,6 +136,15 @@ export default function Home() {
 
   const handleSelectProject = (projId: string) => {
     setSelectedProjectId(projId);
+    // Reset simulation and timeline state when switching projects
+    setIsPlaying(false);
+    setCurrentStep(0);
+    setTimelineSlices([]);
+    setStepGeojsons({});
+    setFloodExtentGeojson(null);
+    setCurrentSimulation(null);
+    setImpactData(null);
+    setValidationData(null);
     loadProjectDetails(projId);
   };
 
@@ -200,7 +208,7 @@ export default function Home() {
     }
   };
 
-  // 4. Timeline Playback loop
+  // 4. Timeline Playback loop (plays forward and halts at final timestep)
   useEffect(() => {
     if (isPlaying) {
       const stepInterval = Math.max(Math.round(400 / playbackSpeed), 100);
@@ -208,12 +216,8 @@ export default function Home() {
         setCurrentStep((prev) => {
           if (timelineSlices.length === 0) return 0;
           if (prev >= timelineSlices.length - 1) {
-            if (isLooping) {
-              return 0; // Seamless loop!
-            } else {
-              setIsPlaying(false);
-              return prev;
-            }
+            setIsPlaying(false); // Stop cleanly at final timestep (no endless loop)
+            return prev;
           }
           return prev + 1;
         });
@@ -224,33 +228,45 @@ export default function Home() {
     return () => {
       if (playTimerRef.current) clearInterval(playTimerRef.current);
     };
-  }, [isPlaying, timelineSlices, playbackSpeed, isLooping]);
+  }, [isPlaying, timelineSlices, playbackSpeed]);
 
   const currentTimeSeconds = timelineSlices[currentStep]?.time_s || currentStep * 60;
 
   // Village coordinates for map pins
+  const defaultCoords: Record<string, [number, number]> = {
+    "Koti Colony": [78.4720, 30.3650],
+    "Malidewal": [78.4950, 30.3400],
+    "Khand": [78.5300, 30.2950],
+    "Chhiddarwala": [78.5600, 30.2400],
+    "Devprayag": [78.5980, 30.1450],
+    "Raini Village": [79.6950, 30.4900],
+    "Tapovan Barrage Worksite": [79.6300, 30.5150],
+    "NTPC Head Race Tunnel": [79.6250, 30.5200],
+    "Vishnuprayag Confluence": [79.5750, 30.5600],
+    "Joshimath Lower Terraces": [79.5650, 30.5550],
+  };
+
   const demoVillages = impactData?.affected_villages?.map((v) => {
-    const coords: Record<string, [number, number]> = {
-      "Koti Colony": [78.4720, 30.3650],
-      "Malidewal": [78.4950, 30.3400],
-      "Khand": [78.5300, 30.2950],
-      "Chhiddarwala": [78.5600, 30.2400],
-      "Devprayag": [78.5980, 30.1450],
-    };
     return {
       name: v.name,
-      coordinates: coords[v.name] || [78.53, 30.28],
+      coordinates: (v.coordinates as [number, number]) || defaultCoords[v.name] || [78.53, 30.28],
       depth: v.max_depth_m,
       arrival: v.arrival_time_min,
       risk: v.risk_level,
     };
-  }) || [
+  }) || (selectedProjectId === "proj_chamoli_002" ? [
+    { name: "Raini Village", coordinates: [79.6950, 30.4900] as [number, number], depth: 5.8, arrival: 6.5, risk: "CRITICAL" },
+    { name: "Tapovan Barrage Worksite", coordinates: [79.6300, 30.5150] as [number, number], depth: 8.2, arrival: 14.0, risk: "CRITICAL" },
+    { name: "NTPC Head Race Tunnel", coordinates: [79.6250, 30.5200] as [number, number], depth: 6.4, arrival: 16.5, risk: "CRITICAL" },
+    { name: "Vishnuprayag Confluence", coordinates: [79.5750, 30.5600] as [number, number], depth: 3.9, arrival: 28.0, risk: "HIGH" },
+    { name: "Joshimath Lower Terraces", coordinates: [79.5650, 30.5550] as [number, number], depth: 2.1, arrival: 34.0, risk: "HIGH" },
+  ] : [
     { name: "Koti Colony", coordinates: [78.4720, 30.3650] as [number, number], depth: 4.2, arrival: 18.5, risk: "CRITICAL" },
     { name: "Malidewal", coordinates: [78.4950, 30.3400] as [number, number], depth: 3.5, arrival: 24.0, risk: "CRITICAL" },
     { name: "Khand", coordinates: [78.5300, 30.2950] as [number, number], depth: 2.8, arrival: 32.5, risk: "HIGH" },
     { name: "Chhiddarwala", coordinates: [78.5600, 30.2400] as [number, number], depth: 1.9, arrival: 45.0, risk: "HIGH" },
     { name: "Devprayag", coordinates: [78.5980, 30.1450] as [number, number], depth: 2.4, arrival: 62.0, risk: "HIGH" },
-  ];
+  ]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
@@ -344,8 +360,6 @@ export default function Home() {
                 }}
                 playbackSpeed={playbackSpeed}
                 onSpeedChange={setPlaybackSpeed}
-                isLooping={isLooping}
-                onLoopToggle={() => setIsLooping(!isLooping)}
               />
             </div>
           </div>

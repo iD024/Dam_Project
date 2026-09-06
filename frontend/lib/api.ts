@@ -43,6 +43,8 @@ export interface AffectedVillage {
   peak_velocity_ms: number;
   population_est: number;
   risk_level: string;
+  coordinates?: [number, number];
+  hazard_rating?: number;
 }
 
 export interface ImpactData {

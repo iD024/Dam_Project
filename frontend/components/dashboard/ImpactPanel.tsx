@@ -89,7 +89,7 @@ export default function ImpactPanel({ impact, onFocusVillage }: ImpactPanelProps
 
         <div className="space-y-2">
           {impact.affected_villages.map((v, i) => {
-            const coords = villageCoords[v.name] || [78.53, 30.28];
+            const coords: [number, number] = (v.coordinates as [number, number]) || villageCoords[v.name] || [78.53, 30.28];
             const isCrit = v.risk_level === "CRITICAL";
             return (
               <div
@@ -106,16 +106,26 @@ export default function ImpactPanel({ impact, onFocusVillage }: ImpactPanelProps
                     <span>Arrival: <strong className="text-slate-200">{v.arrival_time_min}m</strong></span>
                     <span>Depth: <strong className="text-slate-200">{v.max_depth_m}m</strong></span>
                     <span>Pop: <strong className="text-slate-200">{v.population_est}</strong></span>
+                    {v.hazard_rating !== undefined && (
+                      <span className="hidden sm:inline">HR: <strong className="text-amber-300 font-mono">{v.hazard_rating}</strong></span>
+                    )}
                   </div>
                 </div>
 
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                  isCrit
-                    ? "bg-rose-950 text-rose-400 border-rose-800/60"
-                    : "bg-amber-950 text-amber-400 border-amber-800/60"
-                }`}>
-                  {v.risk_level}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    isCrit
+                      ? "bg-rose-950 text-rose-400 border-rose-800/60"
+                      : "bg-amber-950 text-amber-400 border-amber-800/60"
+                  }`}>
+                    {v.risk_level}
+                  </span>
+                  {v.hazard_rating !== undefined && (
+                    <span className="text-[9px] font-mono text-slate-400 sm:hidden">
+                      HR: {v.hazard_rating}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

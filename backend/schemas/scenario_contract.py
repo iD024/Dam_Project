@@ -71,6 +71,14 @@ class ProductsConfig(BaseModel):
     duration: bool = True
     extent_threshold_m: float = Field(default=0.10, description="Threshold depth to classify a cell as flooded (m)")
 
+class FlashFloodConfig(BaseModel):
+    event_type: str = Field(default="dam_break", description="dam_break, flash_flood, cloudburst, glof")
+    rainfall_intensity_mmh: Optional[float] = Field(default=0.0, description="Cloudburst rainfall rate in mm/h")
+    catchment_area_km2: Optional[float] = Field(default=250.0, description="Upstream mountain catchment area in km²")
+    runoff_coefficient: Optional[float] = Field(default=0.70, description="Runoff coefficient")
+    peak_discharge_m3s: Optional[float] = Field(default=5000.0, description="Peak hydrograph discharge in m³/s")
+    surge_duration_s: Optional[float] = Field(default=1800.0, description="Flash flood surge wave duration in seconds")
+
 class ScenarioContract(BaseModel):
     schema_version: str = Field(default="1.0.0")
     project_id: str
@@ -83,6 +91,7 @@ class ScenarioContract(BaseModel):
     hydrology: HydrologyConfig
     roughness: RoughnessConfig
     breach: BreachConfig
+    flash_flood: Optional[FlashFloodConfig] = None
     solvers: List[str] = Field(default_factory=lambda: ["fast_swe"])
     numerics: NumericsConfig = Field(default_factory=NumericsConfig)
     products: ProductsConfig = Field(default_factory=ProductsConfig)

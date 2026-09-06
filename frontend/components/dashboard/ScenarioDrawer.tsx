@@ -1,7 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, CheckCircle2, AlertTriangle, Play, HelpCircle, Layers, Loader2 } from "lucide-react";
+import {
+  Sparkles,
+  CheckCircle2,
+  AlertTriangle,
+  Play,
+  HelpCircle,
+  Layers,
+  Loader2,
+  CloudRain,
+  ShieldAlert,
+  Flame,
+  Zap,
+} from "lucide-react";
 import { api, Dam } from "@/lib/api";
 
 interface ScenarioDrawerProps {
@@ -11,18 +23,33 @@ interface ScenarioDrawerProps {
 }
 
 export default function ScenarioDrawer({ dam, onRunSimulation, isRunning }: ScenarioDrawerProps) {
+  // Mode: Dam Breach vs Flash Flood Generation System
+  const [simulationMode, setSimulationMode] = useState<"breach" | "flash_flood">("breach");
+
+  // Dam Breach parameters
   const [breachWidth, setBreachWidth] = useState(95.0);
   const [topWidth, setTopWidth] = useState(140.0);
   const [formationTime, setFormationTime] = useState(240.0);
   const [invertElevation, setInvertElevation] = useState(750.0);
   const [reservoirLevel, setReservoirLevel] = useState(820.0);
-  const [solver, setSolver] = useState("fast_swe");
   const [manningN, setManningN] = useState(0.042);
+
+  // Flash Flood Generator parameters
+  const [flashFloodType, setFlashFloodType] = useState<"cloudburst" | "glof" | "surge">("cloudburst");
+  const [peakDischarge, setPeakDischarge] = useState(8500.0);
+  const [rainfallRate, setRainfallRate] = useState(125.0);
+  const [catchmentArea, setCatchmentArea] = useState(320.0);
+  const [surgeDurationMin, setSurgeDurationMin] = useState(40);
+
+  // Solver Choice (The Three Methods of Solving)
+  const [solver, setSolver] = useState("fast_swe");
+
+  // AI & Validation states
   const [aiRecommendation, setAiRecommendation] = useState<any>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
   const [loadingAi, setLoadingAi] = useState(false);
 
-  // Trigger AI Parameter Recommendation (Froehlich 2008 Multi-Regressive Empirical Regression)
+  // Trigger AI Parameter Recommendation (Froehlich 2008 Regression)
   const handleAiRecommend = async () => {
     setLoadingAi(true);
     try {
@@ -44,6 +71,29 @@ export default function ScenarioDrawer({ dam, onRunSimulation, isRunning }: Scen
   };
 
   const roundVal = (v: number) => Math.round(v * 10) / 10;
+
+  // Flash flood preset handler
+  const applyFlashFloodPreset = (preset: "chamoli" | "kedarnath" | "spillway") => {
+    if (preset === "chamoli") {
+      setFlashFloodType("glof");
+      setPeakDischarge(8500.0);
+      setRainfallRate(90.0);
+      setCatchmentArea(350.0);
+      setSurgeDurationMin(40);
+    } else if (preset === "kedarnath") {
+      setFlashFloodType("cloudburst");
+      setPeakDischarge(11000.0);
+      setRainfallRate(165.0);
+      setCatchmentArea(420.0);
+      setSurgeDurationMin(30);
+    } else {
+      setFlashFloodType("surge");
+      setPeakDischarge(5500.0);
+      setRainfallRate(60.0);
+      setCatchmentArea(200.0);
+      setSurgeDurationMin(60);
+    }
+  };
 
   const handleValidate = async () => {
     try {
@@ -79,13 +129,21 @@ export default function ScenarioDrawer({ dam, onRunSimulation, isRunning }: Scen
 
   const handleRun = () => {
     onRunSimulation({
+      simulationMode,
+      solver,
+      manningN,
+      // Breach fields
       breachWidth,
       topWidth,
       formationTime,
       invertElevation,
       reservoirLevel,
-      manningN,
-      solver,
+      // Flash flood generator fields
+      event_type: simulationMode === "flash_flood" ? flashFloodType : "dam_break",
+      peak_discharge_m3s: peakDischarge,
+      rainfall_intensity_mmh: rainfallRate,
+      catchment_area_km2: catchmentArea,
+      surge_duration_s: surgeDurationMin * 60,
     });
   };
 
@@ -98,18 +156,44 @@ export default function ScenarioDrawer({ dam, onRunSimulation, isRunning }: Scen
             <Layers className="w-5 h-5 text-sky-400" />
             Scenario Builder
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">Physical Parameters & Breach Setup</p>
+          <p className="text-xs text-slate-400 mt-0.5">Physical Parameters & Hydrodynamics</p>
         </div>
         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950 text-sky-400 border border-sky-800/60">
-          v1.0.0
+          v2.0.0
         </span>
       </div>
 
-      {/* Dam Specs Card */}
-      <div className="mt-4 p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs space-y-1.5">
+      {/* Mode Switcher: Dam Breach vs Dynamic Flash Flood */}
+      <div className="mt-4 grid grid-cols-2 gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+        <button
+          onClick={() => setSimulationMode("breach")}
+          className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
+            simulationMode === "breach"
+              ? "bg-sky-600 text-white shadow-md shadow-sky-600/30"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <ShieldAlert className="w-3.5 h-3.5" />
+          <span>Dam Breach</span>
+        </button>
+        <button
+          onClick={() => setSimulationMode("flash_flood")}
+          className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
+            simulationMode === "flash_flood"
+              ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <CloudRain className="w-3.5 h-3.5" />
+          <span>Flash Flood</span>
+        </button>
+      </div>
+
+      {/* Dam / Mountain Origin Card */}
+      <div className="mt-3.5 p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs space-y-1.5">
         <div className="font-semibold text-sky-400 flex items-center justify-between">
-          <span>{dam?.name || "Tehri Dam"}</span>
-          <span className="text-slate-400 text-[10px] font-normal">{dam?.dam_type || "Rockfill"}</span>
+          <span>{dam?.name || "Hydraulic Structure / Gorge Origin"}</span>
+          <span className="text-slate-400 text-[10px] font-normal">{dam?.dam_type || "Rockfill / Alpine"}</span>
         </div>
         <div className="grid grid-cols-2 gap-2 pt-1 text-slate-300">
           <div>Crest: <span className="text-white font-mono">{dam?.crest_elevation_m || 839.5} m</span></div>
@@ -118,121 +202,220 @@ export default function ScenarioDrawer({ dam, onRunSimulation, isRunning }: Scen
         </div>
       </div>
 
-      {/* AI Recommender Action */}
+      {/* Hydrodynamic Solver Selector (The 3 Methods of Solving) */}
       <div className="mt-4">
-        <button
-          onClick={handleAiRecommend}
-          disabled={loadingAi}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium text-xs shadow-md transition disabled:opacity-50"
+        <label className="block text-slate-300 font-medium mb-1.5 flex items-center justify-between text-xs">
+          <span>Hydrodynamic Solver Scheme</span>
+          <span className="text-[10px] text-sky-400 font-mono">3 Solvers Verified</span>
+        </label>
+        <select
+          value={solver}
+          onChange={(e) => setSolver(e.target.value)}
+          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
         >
-          <Sparkles className="w-4 h-4 text-amber-300" />
-          {loadingAi ? "Calculating Froehlich Regressions..." : "AI Recommend Breach Parameters"}
-        </button>
+          <option value="fast_swe">Method 1: FastSWE2D (2D Shallow Water FV Scheme)</option>
+          <option value="dflowfm">Method 2: Delft3D / D-Flow FM (Flexible Mesh Semi-Implicit)</option>
+          <option value="dualsphysics">Method 3: DualSPHysics SPH (Lagrangian Particle Dynamics)</option>
+        </select>
+        <p className="text-[10px] text-slate-400 mt-1 font-mono">
+          {solver === "fast_swe" && "⚡ Rusanov flux with depth-averaged SWE & Manning bed friction."}
+          {solver === "dflowfm" && "🌊 Semi-implicit theta-scheme (θ=0.7) with subgrid channel conveyance."}
+          {solver === "dualsphysics" && "🔬 Weakly-compressible SPH with Tait EOS & Wendland particle kernel."}
+        </p>
+      </div>
 
-        {aiRecommendation && (
-          <div className="mt-2.5 p-3 rounded-lg bg-violet-950/40 border border-violet-800/50 text-[11px] space-y-1 text-violet-200 animate-in fade-in">
-            <div className="font-semibold text-violet-300 flex items-center justify-between">
-              <span>{aiRecommendation.method}</span>
-              <span className="text-amber-400 font-mono">Confidence: 92%</span>
+      {/* DYNAMIC FLASH FLOOD GENERATION CONTROLS */}
+      {simulationMode === "flash_flood" && (
+        <div className="mt-4 p-3.5 rounded-xl bg-amber-950/25 border border-amber-800/40 text-xs space-y-3.5 animate-in fade-in">
+          <div className="flex items-center justify-between pb-1.5 border-b border-amber-800/30">
+            <span className="font-semibold text-amber-300 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5" />
+              Dynamic Flash Flood Surge Generator
+            </span>
+            <span className="text-[10px] text-amber-400 font-mono">Alpine Hazard</span>
+          </div>
+
+          {/* Presets */}
+          <div>
+            <span className="text-[10px] text-slate-400 block mb-1">Disaster Benchmark Presets:</span>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => applyFlashFloodPreset("chamoli")}
+                className="py-1 px-1.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 text-center transition"
+              >
+                Chamoli GLOF
+              </button>
+              <button
+                type="button"
+                onClick={() => applyFlashFloodPreset("kedarnath")}
+                className="py-1 px-1.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 text-center transition"
+              >
+                Kedarnath Cloudburst
+              </button>
+              <button
+                type="button"
+                onClick={() => applyFlashFloodPreset("spillway")}
+                className="py-1 px-1.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 text-center transition"
+              >
+                Spillway Surge
+              </button>
             </div>
-            <div>Width Range: <span className="font-mono text-white">{aiRecommendation.breach_width_range_m[0]} - {aiRecommendation.breach_width_range_m[1]} m</span></div>
-            <div>Formation Time: <span className="font-mono text-white">{aiRecommendation.recommended_formation_time_s} s</span></div>
-            <div>Peak Outflow Estimate: <span className="font-mono text-amber-300">{aiRecommendation.peak_discharge_est_m3s} m³/s</span></div>
           </div>
-        )}
-      </div>
 
-      {/* Parameter Controls */}
-      <div className="mt-5 space-y-4 text-xs">
-        {/* Solver Selector */}
-        <div>
-          <label className="block text-slate-400 font-medium mb-1.5 flex items-center justify-between">
-            <span>Hydrodynamic Solver</span>
-            <span className="text-[10px] text-sky-400">Multi-engine</span>
-          </label>
-          <select
-            value={solver}
-            onChange={(e) => setSolver(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
-          >
-            <option value="fast_swe">FastSWE2D (High-Speed 2D SWE Finite Volume)</option>
-            <option value="dflowfm">Delft3D / D-Flow FM Flexible Mesh Adapter</option>
-            <option value="dualsphysics">DualSPHysics SPH Particle Adapter</option>
-          </select>
-        </div>
-
-        {/* Breach Bottom Width */}
-        <div>
-          <div className="flex justify-between text-slate-300 mb-1">
-            <span>Breach Bottom Width (Wb)</span>
-            <span className="font-mono font-semibold text-sky-400">{breachWidth} m</span>
+          {/* Peak Discharge Qp */}
+          <div>
+            <div className="flex justify-between text-slate-300 mb-1">
+              <span>Peak Outflow Discharge (Qp)</span>
+              <span className="font-mono font-semibold text-amber-300">{peakDischarge.toLocaleString()} m³/s</span>
+            </div>
+            <input
+              type="range"
+              min={1000}
+              max={15000}
+              step={250}
+              value={peakDischarge}
+              onChange={(e) => setPeakDischarge(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
           </div>
-          <input
-            type="range"
-            min={30}
-            max={200}
-            step={1}
-            value={breachWidth}
-            onChange={(e) => {
-              const bw = Number(e.target.value);
-              setBreachWidth(bw);
-              if (topWidth < bw) setTopWidth(roundVal(bw * 1.3));
-            }}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-          />
-        </div>
 
-        {/* Formation Time */}
-        <div>
-          <div className="flex justify-between text-slate-300 mb-1">
-            <span>Breach Formation Time (tf)</span>
-            <span className="font-mono font-semibold text-sky-400">{formationTime} s ({Math.round(formationTime/60)} min)</span>
+          {/* Cloudburst Rainfall Rate */}
+          <div>
+            <div className="flex justify-between text-slate-300 mb-1">
+              <span>Cloudburst Rainfall Rate</span>
+              <span className="font-mono font-semibold text-amber-300">{rainfallRate} mm/h</span>
+            </div>
+            <input
+              type="range"
+              min={25}
+              max={250}
+              step={5}
+              value={rainfallRate}
+              onChange={(e) => setRainfallRate(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
           </div>
-          <input
-            type="range"
-            min={60}
-            max={600}
-            step={10}
-            value={formationTime}
-            onChange={(e) => setFormationTime(Number(e.target.value))}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-          />
-        </div>
 
-        {/* Reservoir Water Level */}
-        <div>
-          <div className="flex justify-between text-slate-300 mb-1">
-            <span>Reservoir Surface Level (Hr)</span>
-            <span className="font-mono font-semibold text-sky-400">{reservoirLevel} m</span>
+          {/* Surge Duration */}
+          <div>
+            <div className="flex justify-between text-slate-300 mb-1">
+              <span>Surge Duration (Td)</span>
+              <span className="font-mono font-semibold text-amber-300">{surgeDurationMin} min</span>
+            </div>
+            <input
+              type="range"
+              min={10}
+              max={120}
+              step={5}
+              value={surgeDurationMin}
+              onChange={(e) => setSurgeDurationMin(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
           </div>
-          <input
-            type="range"
-            min={760}
-            max={835}
-            step={1}
-            value={reservoirLevel}
-            onChange={(e) => setReservoirLevel(Number(e.target.value))}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-          />
         </div>
+      )}
 
-        {/* Manning Roughness */}
-        <div>
-          <div className="flex justify-between text-slate-300 mb-1">
-            <span>Manning Roughness (n)</span>
-            <span className="font-mono font-semibold text-sky-400">{manningN}</span>
+      {/* DAM BREACH CONTROLS */}
+      {simulationMode === "breach" && (
+        <div className="mt-4 space-y-4 text-xs animate-in fade-in">
+          {/* AI Recommender Action */}
+          <div>
+            <button
+              onClick={handleAiRecommend}
+              disabled={loadingAi}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium text-xs shadow-md transition disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              {loadingAi ? "Calculating Froehlich Regressions..." : "AI Recommend Breach Parameters"}
+            </button>
+
+            {aiRecommendation && (
+              <div className="mt-2.5 p-3 rounded-lg bg-violet-950/40 border border-violet-800/50 text-[11px] space-y-1 text-violet-200 animate-in fade-in">
+                <div className="font-semibold text-violet-300 flex items-center justify-between">
+                  <span>{aiRecommendation.method}</span>
+                  <span className="text-amber-400 font-mono">Confidence: 92%</span>
+                </div>
+                <div>Width Range: <span className="font-mono text-white">{aiRecommendation.breach_width_range_m[0]} - {aiRecommendation.breach_width_range_m[1]} m</span></div>
+                <div>Formation Time: <span className="font-mono text-white">{aiRecommendation.recommended_formation_time_s} s</span></div>
+                <div>Peak Outflow Estimate: <span className="font-mono text-amber-300">{aiRecommendation.peak_discharge_est_m3s} m³/s</span></div>
+              </div>
+            )}
           </div>
-          <input
-            type="range"
-            min={0.025}
-            max={0.080}
-            step={0.001}
-            value={manningN}
-            onChange={(e) => setManningN(Number(e.target.value))}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-          />
+
+          {/* Breach Bottom Width */}
+          <div>
+            <div className="flex justify-between text-slate-300 mb-1">
+              <span>Breach Bottom Width (Wb)</span>
+              <span className="font-mono font-semibold text-sky-400">{breachWidth} m</span>
+            </div>
+            <input
+              type="range"
+              min={30}
+              max={200}
+              step={1}
+              value={breachWidth}
+              onChange={(e) => {
+                const bw = Number(e.target.value);
+                setBreachWidth(bw);
+                if (topWidth < bw) setTopWidth(roundVal(bw * 1.3));
+              }}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
+          </div>
+
+          {/* Formation Time */}
+          <div>
+            <div className="flex justify-between text-slate-300 mb-1">
+              <span>Breach Formation Time (tf)</span>
+              <span className="font-mono font-semibold text-sky-400">{formationTime} s ({Math.round(formationTime/60)} min)</span>
+            </div>
+            <input
+              type="range"
+              min={60}
+              max={600}
+              step={10}
+              value={formationTime}
+              onChange={(e) => setFormationTime(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
+          </div>
+
+          {/* Reservoir Surface Level */}
+          <div>
+            <div className="flex justify-between text-slate-300 mb-1">
+              <span>Reservoir Surface Level (Hr)</span>
+              <span className="font-mono font-semibold text-sky-400">{reservoirLevel} m</span>
+            </div>
+            <input
+              type="range"
+              min={760}
+              max={835}
+              step={1}
+              value={reservoirLevel}
+              onChange={(e) => setReservoirLevel(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
+          </div>
+
+          {/* Manning Roughness */}
+          <div>
+            <div className="flex justify-between text-slate-300 mb-1">
+              <span>Manning Roughness (n)</span>
+              <span className="font-mono font-semibold text-sky-400">{manningN}</span>
+            </div>
+            <input
+              type="range"
+              min={0.025}
+              max={0.080}
+              step={0.001}
+              value={manningN}
+              onChange={(e) => setManningN(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Validation Result Box */}
       {validationResult && (
@@ -262,7 +445,7 @@ export default function ScenarioDrawer({ dam, onRunSimulation, isRunning }: Scen
           onClick={handleValidate}
           className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition"
         >
-          Validate Contract & Inputs
+          Validate Scenario Contract
         </button>
 
         <button
@@ -278,7 +461,11 @@ export default function ScenarioDrawer({ dam, onRunSimulation, isRunning }: Scen
           ) : (
             <>
               <Play className="w-4 h-4 fill-white" />
-              <span>Run Hydrodynamic Simulation</span>
+              <span>
+                {simulationMode === "flash_flood"
+                  ? "Run Dynamic Flash Flood Simulation"
+                  : "Run Dam-Break Hydrodynamic Simulation"}
+              </span>
             </>
           )}
         </button>

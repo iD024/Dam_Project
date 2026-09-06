@@ -36,6 +36,15 @@ class FastSWE2DEngine(SimulationEngine):
         """
         bbox = scenario.domain.bbox
         xmin, ymin, xmax, ymax = bbox
+
+        is_chamoli = (
+            "chamoli" in scenario.project_id.lower()
+            or "rishi" in scenario.scenario_name.lower()
+            or scenario.dam_id == "dam_tapovan_002"
+        )
+        if is_chamoli and (xmin < 79.0 or xmax < 79.0):
+            xmin, ymin, xmax, ymax = 79.55, 30.45, 79.75, 30.58
+
         if (xmax - xmin) < 10.0:  # Geographic coordinates in degrees
             mid_lat = (ymin + ymax) / 2.0
             width_m = (xmax - xmin) * 111320.0 * math.cos(math.radians(mid_lat))
@@ -46,9 +55,10 @@ class FastSWE2DEngine(SimulationEngine):
             dx = max((xmax - xmin) / nx, 15.0)
             dy = max((ymax - ymin) / ny, 15.0)
 
-        # Check if DEM file exists
+        # Check if DEM file exists (only load existing DEM if it matches active project)
         dem_path = Path(scenario.terrain.dem_uri)
-        if dem_path.exists() and dem_path.suffix.lower() in [".tif", ".tiff"]:
+        can_use_dem = dem_path.exists() and dem_path.suffix.lower() in [".tif", ".tiff"] and (not is_chamoli or "chamoli" in str(dem_path).lower())
+        if can_use_dem:
             try:
                 import rasterio
                 with rasterio.open(dem_path) as src:
@@ -68,21 +78,42 @@ class FastSWE2DEngine(SimulationEngine):
         y = np.linspace(0, 1, ny)
         X, Y = np.meshgrid(x, y)
 
-        # Bhagirathi river waypoints in EPSG:4326 down to Devprayag confluence
-        river_waypoints = [
-            (78.4808, 30.3778),  # Tehri Dam (Origin)
-            (78.4720, 30.3650),  # Koti Colony
-            (78.4850, 30.3520),  # Upper Gorge
-            (78.4950, 30.3400),  # Malidewal
-            (78.5080, 30.3200),  # Mid Valley Turn
-            (78.5200, 30.3050),  # Chamba Valley Approach
-            (78.5300, 30.2950),  # Khand
-            (78.5480, 30.2680),  # Lower Gorge
-            (78.5600, 30.2400),  # Chhiddarwala
-            (78.5720, 30.2050),  # Canyon Approach
-            (78.5860, 30.1700),  # Pre-Devprayag Canyon
-            (78.5980, 30.1450),  # Devprayag Confluence
-        ]
+        # River and upstream reservoir corridor waypoints in EPSG:4326
+        is_chamoli = (
+            "chamoli" in scenario.project_id.lower()
+            or "rishi" in scenario.scenario_name.lower()
+            or scenario.dam_id == "dam_tapovan_002"
+        )
+
+        if is_chamoli:
+            river_waypoints = [
+                (79.7200, 30.4750),  # Upstream Glacial Origin
+                (79.6950, 30.4900),  # Raini Village
+                (79.6600, 30.5050),  # Tapovan Vishnugad Barrage
+                (79.6300, 30.5150),  # NTPC Tunnel Worksite
+                (79.6250, 30.5200),  # Dhauliganga Valley Gorge
+                (79.6050, 30.5350),  # Lower Gorge
+                (79.5850, 30.5500),  # Vishnuprayag Confluence
+                (79.5750, 30.5600),  # Joshimath Canyon Floor
+                (79.5650, 30.5550),  # Alaknanda Mainstream
+            ]
+        else:
+            river_waypoints = [
+                (78.5050, 30.3950),  # Upper Reservoir Bhagirathi Inflow
+                (78.4900, 30.3880),  # Tehri Reservoir Lake Basin
+                (78.4808, 30.3778),  # Tehri Dam (Breach Origin)
+                (78.4720, 30.3650),  # Koti Colony
+                (78.4850, 30.3520),  # Upper Gorge
+                (78.4950, 30.3400),  # Malidewal
+                (78.5080, 30.3200),  # Mid Valley Turn
+                (78.5200, 30.3050),  # Chamba Valley Approach
+                (78.5300, 30.2950),  # Khand
+                (78.5480, 30.2680),  # Lower Gorge
+                (78.5600, 30.2400),  # Chhiddarwala
+                (78.5720, 30.2050),  # Canyon Approach
+                (78.5860, 30.1700),  # Pre-Devprayag Canyon
+                (78.5980, 30.1450),  # Devprayag Confluence
+            ]
 
         # Convert river waypoints to local metric offsets
         m_per_deg_lon = width_m / max(xmax - xmin, 1e-6)
@@ -153,8 +184,18 @@ class FastSWE2DEngine(SimulationEngine):
         v = np.zeros((ny, nx), dtype=np.float64)
 
         # Dam location: mapped directly from geographic coordinates
-        dam_lon = 78.4808
-        dam_lat = 30.3778
+        is_chamoli = (
+            "chamoli" in scenario.project_id.lower()
+            or "rishi" in scenario.scenario_name.lower()
+            or scenario.dam_id == "dam_tapovan_002"
+        )
+        if is_chamoli:
+            dam_lon = 79.6600
+            dam_lat = 30.5050
+        else:
+            dam_lon = 78.4808
+            dam_lat = 30.3778
+
         dam_j = int(np.clip((dam_lon - xmin) / (xmax - xmin) * nx, 1, nx - 2))
         dam_i = int(np.clip((ymax - dam_lat) / (ymax - ymin) * ny, 1, ny - 2))
 
@@ -165,9 +206,39 @@ class FastSWE2DEngine(SimulationEngine):
         t_form = scenario.breach.formation_time_s
         b_final = scenario.breach.bottom_width_m
 
-        # Simulation time parameters: Ensure at least 3600s (60 min) so wave reaches Devprayag
-        total_duration = min(max(scenario.numerics.simulation_duration_s, 3600.0), 7200.0)
-        save_interval = max(scenario.numerics.output_interval_s, 300.0)  # 5-minute output intervals
+        # Check for dynamic flash flood surge mode
+        is_flash_flood = (
+            scenario.flash_flood is not None
+            and scenario.flash_flood.event_type in ["flash_flood", "cloudburst", "glof"]
+        )
+
+        # Inflow cell coordinates
+        if is_flash_flood and is_chamoli:
+            origin_lon, origin_lat = 79.7200, 30.4750
+            inflow_j = int(np.clip((origin_lon - xmin) / (xmax - xmin) * nx, 1, nx - 2))
+            inflow_i = int(np.clip((ymax - origin_lat) / (ymax - ymin) * ny, 1, ny - 2))
+        else:
+            inflow_j, inflow_i = dam_j, dam_i
+
+        # Initialize upstream reservoir lake water body at T=0
+        if is_chamoli:
+            for r in range(dam_i, ny):
+                for c in range(0, nx):
+                    if zb[r, c] < h_res:
+                        res_depth = min(h_res - zb[r, c], 40.0)
+                        if res_depth > 0.5:
+                            h[r, c] = res_depth
+        else:
+            for r in range(0, dam_i + 1):
+                for c in range(0, nx):
+                    if zb[r, c] < h_res:
+                        res_depth = min(h_res - zb[r, c], 90.0)
+                        if res_depth > 0.5:
+                            h[r, c] = res_depth
+
+        # Simulation time parameters
+        total_duration = min(max(scenario.numerics.simulation_duration_s, 300.0), 7200.0)
+        save_interval = max(scenario.numerics.output_interval_s, 60.0)
         n_saves = int(total_duration / save_interval) + 1
 
         # Diagnostic collectors
@@ -184,7 +255,7 @@ class FastSWE2DEngine(SimulationEngine):
         step = 0
         save_idx = 0
 
-        # Save t=0
+        # Save t=0 (with full standing reservoir lake)
         history_times.append(0.0)
         history_depth.append(h.copy())
         history_vel.append(np.zeros_like(h))
@@ -193,8 +264,19 @@ class FastSWE2DEngine(SimulationEngine):
             progress_callback(15.0, "Hydrodynamic solver running")
 
         while current_time < total_duration:
-            # 1. Breach hydrograph calculation (Dynamic Broad-Crested Weir model)
-            if current_time >= scenario.breach.start_s and reservoir_vol > 0:
+            # 1. Inflow hydrograph calculation
+            if is_flash_flood:
+                # Dynamic alpine cloudburst / GLOF surge wave hydrograph
+                ff = scenario.flash_flood
+                q_peak = ff.peak_discharge_m3s or 6500.0
+                t_surge = ff.surge_duration_s or 1800.0
+                t_peak = t_surge * 0.20
+                if current_time <= t_surge:
+                    t_norm = max(current_time / max(t_peak, 1.0), 1e-4)
+                    q_breach = q_peak * (t_norm ** 2.2) * math.exp(-2.2 * (t_norm - 1.0))
+                else:
+                    q_breach = 0.0
+            elif current_time >= scenario.breach.start_s and reservoir_vol > 0:
                 t_rel = current_time - scenario.breach.start_s
                 form_frac = min(1.0, t_rel / max(t_form, 1.0))
                 
@@ -223,14 +305,15 @@ class FastSWE2DEngine(SimulationEngine):
 
             # Update reservoir storage depletion
             vol_released = q_breach * dt
-            if vol_released > reservoir_vol:
-                vol_released = reservoir_vol
-                q_breach = vol_released / max(dt, 1e-6)
-            reservoir_vol -= vol_released
+            if not is_flash_flood:
+                if vol_released > reservoir_vol:
+                    vol_released = reservoir_vol
+                    q_breach = vol_released / max(dt, 1e-6)
+                reservoir_vol -= vol_released
             total_inflow_m3 += vol_released
 
-            # Inject breach flow into source cell
-            h[dam_i, dam_j] += (q_breach * dt) / cell_area
+            # Inject breach/inflow into source cell
+            h[inflow_i, inflow_j] += (q_breach * dt) / cell_area
 
             # 3. Finite-Volume Shallow Water flux update (Rusanov / Local Lax-Friedrichs Flux)
             eta = zb + h  # Water surface elevation

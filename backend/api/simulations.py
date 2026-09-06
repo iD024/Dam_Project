@@ -131,6 +131,8 @@ def execute_simulation_job(sim_id: str, db_factory, parameter_overrides: Optiona
         with open(extent_geojson_path, "r", encoding="utf-8") as f:
             extent_geojson = json.load(f)
 
+        max_vel_arr = sim_data["max_velocity"] if "max_velocity" in sim_data else None
+
         impact_data = compute_spatial_impacts(
             simulation_id=sim.id,
             extent_geojson=extent_geojson,
@@ -138,6 +140,7 @@ def execute_simulation_job(sim_id: str, db_factory, parameter_overrides: Optiona
             arrival_time_raster=arr_arr,
             exposure_assets=asset_dicts,
             bounds=bounds,
+            max_velocity_raster=max_vel_arr,
         )
         sim.metrics_summary["impact"] = impact_data.model_dump()
 
@@ -232,6 +235,7 @@ def get_simulation_impact(simulation_id: str, db: Session = Depends(get_db)):
             import numpy as np
             workdir = settings.OUTPUT_DIR / sim.id / "work"
             data = np.load(workdir / "raw_simulation.npz")
+            max_vel_arr = data["max_velocity"] if "max_velocity" in data else None
             impact_res = compute_spatial_impacts(
                 simulation_id=sim.id,
                 extent_geojson=extent_geojson,
@@ -239,6 +243,7 @@ def get_simulation_impact(simulation_id: str, db: Session = Depends(get_db)):
                 arrival_time_raster=data["arrival_time"],
                 exposure_assets=[],
                 bounds=data["extent"].tolist(),
+                max_velocity_raster=max_vel_arr,
             )
             return impact_res
         raise HTTPException(status_code=400, detail="Impact analysis not yet available. Ensure simulation is completed.")

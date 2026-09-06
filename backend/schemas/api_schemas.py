@@ -127,6 +127,8 @@ class AffectedVillage(BaseModel):
     peak_velocity_ms: float
     population_est: int = 0
     risk_level: str = "HIGH"  # LOW, MEDIUM, HIGH, CRITICAL
+    coordinates: Optional[List[float]] = None
+    hazard_rating: Optional[float] = None
 
 class ImpactResponse(BaseModel):
     simulation_id: str

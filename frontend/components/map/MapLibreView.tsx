@@ -63,6 +63,19 @@ const RIVER_WAYPOINTS: [number, number][] = [
   [78.5980, 30.1450], // Devprayag Confluence
 ];
 
+// Rishi Ganga / Dhauliganga River waypoints for Chamoli flash flood corridor
+const CHAMOLI_RIVER_WAYPOINTS: [number, number][] = [
+  [79.7200, 30.4750], // Upstream Rishi Ganga Glacial Origin
+  [79.6950, 30.4900], // Raini Village
+  [79.6600, 30.5050], // Tapovan Vishnugad Barrage
+  [79.6300, 30.5150], // NTPC Tunnel Worksite
+  [79.6250, 30.5200], // Dhauliganga Valley Gorge
+  [79.6050, 30.5350], // Lower Gorge
+  [79.5850, 30.5500], // Vishnuprayag Confluence
+  [79.5750, 30.5600], // Joshimath Canyon Floor
+  [79.5650, 30.5550], // Alaknanda Mainstream
+];
+
 export default function MapLibreView({
   damLocation = [78.4808, 30.3778],
   damName = "Tehri Dam",
@@ -81,6 +94,12 @@ export default function MapLibreView({
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const wavefrontMarkerRef = useRef<maplibregl.Marker | null>(null);
   const [selectedBasemap, setSelectedBasemap] = useState<"satellite" | "topo" | "osm">("satellite");
+
+  const isChamoli = (damLocation[0] || 0) > 79.0;
+  const activeRiverWaypoints = isChamoli ? CHAMOLI_RIVER_WAYPOINTS : RIVER_WAYPOINTS;
+  const activeRiverName = isChamoli ? "Rishi Ganga / Dhauliganga River Corridor" : "Bhagirathi River Corridor";
+  const activeSurgeLabel = isChamoli ? "Rishi Ganga Flash Flood Surge" : "Bhagirathi Gorge Surge";
+  const maxCorridorKm = isChamoli ? 28.5 : 42.5;
 
   // Determine current water GeoJSON based on active timestep
   const getCurrentFloodData = () => {
@@ -155,7 +174,7 @@ export default function MapLibreView({
           },
         ],
       },
-      center: [78.495, 30.345], // Centered on Bhagirathi valley path
+      center: damLocation,
       zoom: 12.0,
       pitch: 48,
       bearing: -12,
@@ -172,9 +191,9 @@ export default function MapLibreView({
           type: "Feature",
           geometry: {
             type: "LineString",
-            coordinates: RIVER_WAYPOINTS,
+            coordinates: activeRiverWaypoints,
           },
-          properties: { name: "Bhagirathi River Corridor" },
+          properties: { name: activeRiverName },
         },
       });
 
@@ -329,6 +348,33 @@ export default function MapLibreView({
     map.setLayoutProperty("basemap-osm", "visibility", type === "osm" ? "visible" : "none");
   };
 
+  // Dynamically update River Corridor & Re-center camera when Project/Dam changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const source = map.getSource("river-corridor") as maplibregl.GeoJSONSource;
+    if (source) {
+      source.setData({
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: activeRiverWaypoints,
+        },
+        properties: { name: activeRiverName },
+      });
+    }
+
+    if (!focusedLocation) {
+      map.flyTo({
+        center: damLocation,
+        zoom: 12.0,
+        pitch: 48,
+        duration: 1500,
+      });
+    }
+  }, [damLocation[0], damLocation[1]]);
+
   // Update Dam & Village Markers
   useEffect(() => {
     const map = mapRef.current;
@@ -336,18 +382,31 @@ export default function MapLibreView({
 
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
+    if (wavefrontMarkerRef.current) {
+      wavefrontMarkerRef.current.remove();
+      wavefrontMarkerRef.current = null;
+    }
 
     // Dam breach origin marker
     const damEl = document.createElement("div");
     damEl.className =
       "flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-tr from-red-700 to-rose-500 text-white shadow-2xl border-2 border-white font-bold text-sm cursor-pointer hover:scale-125 transition-transform animate-pulse";
     damEl.innerHTML = "▲";
-    damEl.title = `${damName} (Breach Origin)`;
+    damEl.title = `${damName} (${isChamoli ? "Flash Flood / Barrage Surge" : "Breach Origin"})`;
 
-    const damMarker = new maplibregl.Marker({ element: damEl })
-      .setLngLat(damLocation)
-      .setPopup(
-        new maplibregl.Popup({ offset: 25 }).setHTML(`
+    const damPopupHtml = isChamoli
+      ? `
+          <div class="p-2.5 text-slate-800 text-xs font-sans">
+            <div class="font-bold text-sm text-red-600 mb-1">${damName}</div>
+            <div><strong>Barrage Crest:</strong> 1803.0 m</div>
+            <div><strong>Spillway Capacity:</strong> 4,200 m³/s</div>
+            <div><strong>Catchment:</strong> 1,030 km² (Glacial High Alpine)</div>
+            <div class="mt-1.5 text-red-700 font-semibold flex items-center gap-1">
+              <span>⚠</span> Flash Flood & GLOF Surge Origin
+            </div>
+          </div>
+        `
+      : `
           <div class="p-2.5 text-slate-800 text-xs font-sans">
             <div class="font-bold text-sm text-red-600 mb-1">${damName}</div>
             <div><strong>Crest Elevation:</strong> 839.5 m</div>
@@ -357,8 +416,11 @@ export default function MapLibreView({
               <span>⚠</span> Breach Hydrodynamic Origin
             </div>
           </div>
-        `)
-      )
+        `;
+
+    const damMarker = new maplibregl.Marker({ element: damEl })
+      .setLngLat(damLocation)
+      .setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(damPopupHtml))
       .addTo(map);
     markersRef.current.push(damMarker);
 
@@ -388,7 +450,7 @@ export default function MapLibreView({
         .addTo(map);
       markersRef.current.push(marker);
     });
-  }, [damLocation, damName, villages]);
+  }, [damLocation, damName, villages, isChamoli]);
 
   // Update Dynamic Leading Wavefront Surge Marker along river corridor
   useEffect(() => {
@@ -397,18 +459,18 @@ export default function MapLibreView({
 
     // Calculate current wave crest coordinates along the river
     const fraction = Math.min(Math.max(timeStep / Math.max(maxTimeSteps - 1, 1), 0), 1);
-    const floatIdx = fraction * (RIVER_WAYPOINTS.length - 1);
+    const floatIdx = fraction * (activeRiverWaypoints.length - 1);
     const idx0 = Math.floor(floatIdx);
-    const idx1 = Math.min(idx0 + 1, RIVER_WAYPOINTS.length - 1);
+    const idx1 = Math.min(idx0 + 1, activeRiverWaypoints.length - 1);
     const rem = floatIdx - idx0;
 
-    const p0 = RIVER_WAYPOINTS[idx0];
-    const p1 = RIVER_WAYPOINTS[idx1];
+    const p0 = activeRiverWaypoints[idx0];
+    const p1 = activeRiverWaypoints[idx1];
     const currentLng = p0[0] + (p1[0] - p0[0]) * rem;
     const currentLat = p0[1] + (p1[1] - p0[1]) * rem;
 
     const elapsedMin = Math.round(fraction * 60);
-    const distKm = ((fraction) * 42.5).toFixed(1);
+    const distKm = ((fraction) * maxCorridorKm).toFixed(1);
     const estSpeed = Math.max(12.8 - fraction * 4.2, 3.8).toFixed(1);
 
     if (!wavefrontMarkerRef.current) {
@@ -419,7 +481,7 @@ export default function MapLibreView({
         <div class="absolute w-6 h-6 rounded-full bg-sky-500/60 animate-pulse pointer-events-none"></div>
         <div class="relative px-2.5 py-1 rounded-full bg-slate-950/95 border-2 border-cyan-400 text-cyan-300 font-mono text-[11px] font-bold shadow-2xl flex items-center gap-1.5 backdrop-blur-md transform hover:scale-110 transition-transform">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>🌊 Wave Crest T+${elapsedMin}m</span>
+          <span class="wave-crest-badge-text">🌊 Wave Crest T+${elapsedMin}m</span>
         </div>
       `;
       const marker = new maplibregl.Marker({ element: waveEl })
@@ -440,6 +502,10 @@ export default function MapLibreView({
       wavefrontMarkerRef.current = marker;
     } else {
       wavefrontMarkerRef.current.setLngLat([currentLng, currentLat]);
+      const badgeSpan = wavefrontMarkerRef.current.getElement()?.querySelector(".wave-crest-badge-text");
+      if (badgeSpan) {
+        badgeSpan.textContent = `🌊 Wave Crest T+${elapsedMin}m`;
+      }
       wavefrontMarkerRef.current.getPopup()?.setHTML(`
         <div class="p-2 text-slate-800 text-xs font-sans">
           <div class="font-bold text-sky-700 flex items-center gap-1 mb-1">
@@ -451,7 +517,7 @@ export default function MapLibreView({
         </div>
       `);
     }
-  }, [timeStep, maxTimeSteps]);
+  }, [timeStep, maxTimeSteps, activeRiverWaypoints, maxCorridorKm]);
 
   // Update Flood Water Layer based on Active Timestep & GeoJSON
   useEffect(() => {
@@ -571,7 +637,7 @@ export default function MapLibreView({
   }, [focusedLocation]);
 
   const progressFraction = Math.min(Math.max(timeStep / Math.max(maxTimeSteps - 1, 1), 0), 1);
-  const currentDistanceKm = (progressFraction * 42.5).toFixed(1);
+  const currentDistanceKm = (progressFraction * maxCorridorKm).toFixed(1);
   const currentElapsedMin = Math.round(progressFraction * 60);
 
   return (
@@ -587,7 +653,7 @@ export default function MapLibreView({
           </span>
           <div>
             <div className="text-[11px] font-bold text-white flex items-center gap-1.5 leading-none">
-              <span>Bhagirathi Gorge Surge</span>
+              <span>{activeSurgeLabel}</span>
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-950 text-sky-400 border border-sky-800/50">
                 T + {currentElapsedMin}m
               </span>

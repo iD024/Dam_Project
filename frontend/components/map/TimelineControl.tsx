@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Repeat, Gauge } from "lucide-react";
+import { Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Gauge } from "lucide-react";
 
 interface TimelineProps {
   currentStep: number;
@@ -13,8 +13,6 @@ interface TimelineProps {
   onReset: () => void;
   playbackSpeed?: number;
   onSpeedChange?: (speed: number) => void;
-  isLooping?: boolean;
-  onLoopToggle?: () => void;
   maxTimeSeconds?: number;
 }
 
@@ -28,8 +26,6 @@ export default function TimelineControl({
   onReset,
   playbackSpeed = 1,
   onSpeedChange,
-  isLooping = true,
-  onLoopToggle,
   maxTimeSeconds = 7200,
 }: TimelineProps) {
   // Format seconds to HH:MM:SS
@@ -130,21 +126,6 @@ export default function TimelineControl({
         >
           <Gauge className="w-3 h-3 text-sky-400" />
           <span>{playbackSpeed}x</span>
-        </button>
-      )}
-
-      {/* Loop Toggle Button */}
-      {onLoopToggle && (
-        <button
-          onClick={onLoopToggle}
-          className={`p-2 rounded-xl border transition shrink-0 ${
-            isLooping
-              ? "bg-sky-950 border-sky-700 text-sky-300 shadow-sm"
-              : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
-          }`}
-          title={isLooping ? "Continuous Simulation Loop Enabled" : "Loop Disabled (Stop at End)"}
-        >
-          <Repeat className="w-3.5 h-3.5" />
         </button>
       )}
     </div>

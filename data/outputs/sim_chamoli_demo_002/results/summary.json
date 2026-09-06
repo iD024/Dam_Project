@@ -1,0 +1,21 @@
+{
+  "simulation_id": "proj_chamoli_002",
+  "status": "completed",
+  "solver": "fast_swe",
+  "crs": "EPSG:4326",
+  "bounds": [
+    79.55,
+    30.45,
+    79.75,
+    30.58
+  ],
+  "max_depth_m": 45.58378691659781,
+  "max_velocity_ms": 35.35533905932738,
+  "peak_flooded_area_km2": 1.182133333333341e-09,
+  "files": {
+    "max_depth_tif": "/home/laksh/Projects/Dam_Project/data/outputs/sim_chamoli_demo_002/results/max_depth.tif",
+    "max_velocity_tif": "/home/laksh/Projects/Dam_Project/data/outputs/sim_chamoli_demo_002/results/max_velocity.tif",
+    "arrival_time_tif": "/home/laksh/Projects/Dam_Project/data/outputs/sim_chamoli_demo_002/results/arrival_time.tif",
+    "flood_extent_geojson": "/home/laksh/Projects/Dam_Project/data/outputs/sim_chamoli_demo_002/results/flood_extent.geojson"
+  }
+}
