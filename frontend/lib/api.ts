@@ -1,4 +1,10 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const getApiBase = (): string => {
+  const envUrl = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) || "http://localhost:8000/api/v1";
+  const trimmed = envUrl.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed}/api/v1`;
+};
+
+export const API_BASE = getApiBase();
 
 export interface Project {
   id: string;
@@ -82,9 +88,27 @@ export interface ValidationData {
 }
 
 export const api = {
+  async checkHealth(): Promise<{ status: string; service?: string } | null> {
+    try {
+      const rootUrl = API_BASE.replace(/\/api\/v1$/, "");
+      const res = await fetch(`${rootUrl}/api/health`);
+      if (!res.ok) return null;
+      return res.json();
+    } catch {
+      return null;
+    }
+  },
+
   async getProjects(): Promise<Project[]> {
-    const res = await fetch(`${API_BASE}/projects`);
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/projects`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.warn("[API] Could not fetch projects (backend may be starting or offline):", err);
+      return [];
+    }
   },
 
   async getProjectDams(projectId: string): Promise<Dam[]> {

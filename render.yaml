@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: dam-break-simulation-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: CORS_ORIGINS
+        value: "https://*.vercel.app,http://localhost:3000"
+      - key: PORT
+        value: "8000"

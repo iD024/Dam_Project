@@ -31,6 +31,10 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The frontend is ready for immediate deployment to Vercel.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Set the **Root Directory** in Vercel to `frontend`.
+- Set the environment variable `NEXT_PUBLIC_API_URL` to your live backend URL (e.g., `https://your-backend.onrender.com/api/v1`).
+
+For complete, step-by-step instructions (including deploying the Python backend on Render), refer to the [Production Deployment Guide (Vercel & Render)](../docs/DEPLOYMENT_GUIDE_VERCEL.md).
+
